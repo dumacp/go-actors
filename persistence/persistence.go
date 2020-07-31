@@ -117,9 +117,9 @@ func (provider *Boltdb) loadOrInit(actorName string) (e *entry, loaded bool) {
 			}
 			log.Printf("bucket event: %s, %d, %d", keyEvents, numSnap, num)
 			events := make(map[int][]byte)
-			for i := numSnap; i < num; i++ {
+			for i := numSnap; i <= num; i++ {
 				v := bkEvents.Get([]byte(strconv.Itoa(i)))
-				log.Printf("event: %s", v)
+				// log.Printf("event: %s", v)
 				if v == nil {
 					break
 				}
@@ -193,7 +193,7 @@ func (provider *Boltdb) loadOrInit(actorName string) (e *entry, loaded bool) {
 			if err := bkActor.Put([]byte(keyLastEvents), lastEvents); err != nil {
 				return err
 			}
-			log.Printf("bucket lastEvent: %s", lastEvents)
+			// log.Printf("bucket lastEvent: %s", lastEvents)
 			e.eventsBucket = lastEvents
 			return nil
 		}); err != nil {
@@ -219,7 +219,7 @@ func (provider *Boltdb) loadOrInit(actorName string) (e *entry, loaded bool) {
 
 //Restart provider
 func (provider *Boltdb) Restart() {
-	log.Println("RESTAART")
+	log.Println("RESTART persistence provider")
 }
 
 //GetSnapshotInterval get snapshot interval in provider
@@ -234,7 +234,7 @@ func (provider *Boltdb) GetSnapshot(actorName string) (snapshot interface{},
 	if !load || e.snapshot == nil {
 		return nil, 0, false
 	}
-	log.Printf("entry GetSnapshot: --------%q\n", e)
+	// log.Printf("entry GetSnapshot: --------%q\n", e)
 	snap := provider.snapFunc(e.snapshot)
 	return snap, e.eventIndexSnap, true
 }
@@ -243,18 +243,17 @@ func (provider *Boltdb) GetSnapshot(actorName string) (snapshot interface{},
 func (provider *Boltdb) GetEvents(actorName string,
 	eventIndexStart int, callback func(e interface{})) {
 
-	entry, _ := provider.loadOrInit(actorName)
-	log.Printf("GetEvents: %d, %d, %d", entry.eventIndex, entry.eventIndexSnap, eventIndexStart)
-	for i := eventIndexStart; i <= entry.eventIndex; i++ {
-		e, ok := entry.events[i]
+	e, _ := provider.loadOrInit(actorName)
+	// log.Printf("GetEvents: %d, %d, %d", entry.eventIndex, entry.eventIndexSnap, eventIndexStart)
+	for i := eventIndexStart; i <= e.eventIndex; i++ {
+		ev, ok := e.events[i]
 		if ok {
-			log.Printf("get Events: --------%q\n", e)
-			event := provider.eventFunc(e)
-			log.Printf("get Events proto: --------%q\n", event)
+			// log.Printf("get Events: --------%q\n", e)
+			event := provider.eventFunc(ev)
+			// log.Printf("get Events proto: --------%q\n", event)
 			callback(event)
 		}
 	}
-
 }
 
 //PersistEvent persiste event
@@ -292,13 +291,14 @@ func (provider *Boltdb) PersistEvent(actorName string,
 		if err := bk.Put([]byte(strconv.Itoa(eventIndex)), entry.events[eventIndex]); err != nil {
 			return err
 		}
-		log.Printf("bucket: %s, key: %d, value: %s",
-			entry.eventsBucket,
-			eventIndex,
-			event,
-		)
+		// log.Printf("bucket: %s, key: %d, value: %s",
+		// 	entry.eventsBucket,
+		// 	eventIndex,
+		// 	event,
+		// )
 		return nil
 	}); err != nil {
+		log.Println(err)
 	}
 }
 
@@ -306,11 +306,11 @@ func (provider *Boltdb) PersistEvent(actorName string,
 func (provider *Boltdb) PersistSnapshot(actorName string,
 	eventIndex int, snapshot proto.Message) {
 
-	log.Printf("index reques Snapshot: %d", eventIndex)
+	// log.Printf("index reques Snapshot: %d", eventIndex)
 
 	e, _ := provider.loadOrInit(actorName)
 
-	log.Printf("len store: %d", len(e.events))
+	// log.Printf("len store: %d", len(e.events))
 
 	e.eventIndexSnap = eventIndex
 	var err error
@@ -353,5 +353,13 @@ func (provider *Boltdb) PersistSnapshot(actorName string,
 
 		return nil
 	}); err != nil {
+		log.Println(err)
+	}
+
+	// TODO:
+	// safe memory allocation
+	if e != nil && len(e.events) > 2048 {
+		log.Printf("delete store in-memory")
+		provider.store = make(map[string]*entry)
 	}
 }
