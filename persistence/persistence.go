@@ -400,7 +400,7 @@ func (provider *Boltdb) PersistEvent(actorName string,
 		log.Println(err)
 		return
 	}
-	//log.Printf("persist Events -> %s\n", evt)
+	// log.Printf("persist Events -> %s\n", evt)
 	// e.events[eventIndex] = evt[:]
 	// e.eventIndex = eventIndex
 
