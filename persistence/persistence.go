@@ -64,31 +64,34 @@ func NewBoltdbProvider(path string, snapshotInterval int, eventFunc ParseMessage
 }
 
 func (provider *Boltdb) loadOrInit(actorName string) (*entry, bool) {
-	log.Println("loadOrInit")
+	//log.Println("loadOrInit")
 	// var e *entry
-	// provider.mu.Lock()
-	e := new(entry)
-	defer func() {
-		// provider.mu.Unlock()
-		log.Printf("exit loadOrInit %s", e.eventsBucket)
-	}()
 
 	// funcLoad := func() (*entry, bool, error) {
 	// provider.mu.RLock()
 	// defer provider.mu.RUnlock()
 	// var ok bool
+	provider.mu.Lock()
+	defer provider.mu.Unlock()
+
 	et, ok := provider.store[actorName]
 	if ok {
 		// if et != nil {
-		log.Printf("exit loadOrInit before %s", et.eventsBucket)
+		//log.Printf("exit loadOrInit before %s", et.eventsBucket)
 		return et, true
 		// }
 	}
+	e := new(entry)
+	provider.store[actorName] = e
+	//defer log.Printf("exit loadOrInit %s", e.eventsBucket)
 
 	// e.storeEvents = &entryEvents{}
 
 	//	log.Printf("entry: 1--------%q\n", e)
 
+	keyEvents := make([]byte, 0)
+	var num int
+	var numSnap int
 	err := provider.db.View(func(tx *bolt.Tx) error {
 		bk := tx.Bucket([]byte(actorName))
 		if bk == nil {
@@ -96,11 +99,14 @@ func (provider *Boltdb) loadOrInit(actorName string) (*entry, bool) {
 		}
 
 		//events bucket name
-		keyEvents := bk.Get([]byte(keyLastEvents))
-		if keyEvents == nil || len(keyEvents) <= 0 {
+		keyEvts := bk.Get([]byte(keyLastEvents))
+		if keyEvts == nil || len(keyEvts) <= 0 {
 			return fmt.Errorf("empty events, keyLastEvents -> %s", keyLastEvents)
 		}
+		keyEvents := append(keyEvents, keyEvts...)
+
 		e.eventsBucket = keyEvents
+		e.lastEventsBucket = keyEvents
 
 		//eventsIndex
 		eventIndex := bk.Get([]byte(keyEventIndex))
@@ -108,13 +114,14 @@ func (provider *Boltdb) loadOrInit(actorName string) (*entry, bool) {
 			return fmt.Errorf("empty events, keyEventIndex -> %s", keyEventIndex)
 			// return errors.New("empty events")
 		}
-		num, err := strconv.Atoi(string(eventIndex))
+		var err error
+		num, err = strconv.Atoi(string(eventIndex))
 		if err != nil {
 			return err
 		}
 		e.eventIndex = num
 
-		numSnap := 0
+		numSnap = 0
 		//eventIndexSnap
 		eventIndexSnap := bk.Get([]byte(keyEventIndexSnapshot))
 		if eventIndexSnap != nil {
@@ -123,7 +130,7 @@ func (provider *Boltdb) loadOrInit(actorName string) (*entry, bool) {
 			if err != nil {
 				return err
 			}
-			log.Printf("loadOrInit, keyEventIndexSnapshot -> %s", eventIndexSnap)
+			//log.Printf("loadOrInit, keyEventIndexSnapshot -> %s", eventIndexSnap)
 			e.eventIndexSnap = numSnap
 		}
 
@@ -157,21 +164,19 @@ func (provider *Boltdb) loadOrInit(actorName string) (*entry, bool) {
 		return nil
 	})
 
-	log.Printf("InitOrLoad, eventbucket -> %s", e.eventsBucket)
+	//log.Printf("InitOrLoad, eventbucket -> %s", e.eventsBucket)
 
 	if err == nil {
-		// provider.store[actorName] = e
+		//provider.store[actorName] = e
 		return e, false
 	}
 
-	log.Printf("funcLoad error: %s", err)
+	//log.Printf("funcLoad error: %s", err)
 	// return nil, false, err
 
 	//	log.Printf("entry: 2--------%q\n", e)
 	// return e, false, nil
 	// }
-
-	log.Println("loadOrInit 1")
 
 	// if entry, _, err := funcLoad(); err == nil {
 
@@ -222,17 +227,17 @@ func (provider *Boltdb) loadOrInit(actorName string) (*entry, bool) {
 	// provider.mu.Lock()
 	// defer provider.mu.Unlock()
 
+	lastEvents := []byte(fmt.Sprintf("%s-%s", keyEventsPrefix, uuid.New()))
 	err = provider.db.Update(func(tx *bolt.Tx) error {
 		bkActor, err := tx.CreateBucketIfNotExists([]byte(actorName))
 		if err != nil {
 			return bolt.ErrBucketNotFound
 		}
 
-		lastEvents := []byte(fmt.Sprintf("%s-%s", keyEventsPrefix, uuid.New()))
 		if err := bkActor.Put([]byte(keyLastEvents), lastEvents); err != nil {
 			return err
 		}
-		log.Printf("bucket lastEvent: %s", lastEvents)
+		//log.Printf("bucket lastEvent: %s", lastEvents)
 		e.eventsBucket = lastEvents
 		return nil
 	})
@@ -242,14 +247,10 @@ func (provider *Boltdb) loadOrInit(actorName string) (*entry, bool) {
 		return nil, false
 	}
 
-	log.Println("loadOrInit 3")
-
 	// e.storeEvents = e.storeEvents
 	e.eventIndex = 0
 
-	// provider.store[actorName] = e
-
-	log.Println("loadOrInit 4")
+	//provider.store[actorName] = e
 
 	// log.Printf("load init entry final: --------%#v\n", e)
 	return e, false
@@ -263,14 +264,14 @@ func (provider *Boltdb) Restart() {
 
 //GetSnapshotInterval get snapshot interval in provider
 func (provider *Boltdb) GetSnapshotInterval() int {
-	log.Printf("GetSnapshotInterval -> %d", provider.snapshotInterval)
+	//log.Printf("GetSnapshotInterval -> %d", provider.snapshotInterval)
 	interval := provider.snapshotInterval
 	return interval
 }
 
 //GetSnapshot get last snapshot in provider for actor
 func (provider *Boltdb) GetSnapshot(actorName string) (interface{}, int, bool) {
-	log.Println("GetSnapshot")
+	//log.Println("GetSnapshot")
 
 	e, _ := provider.loadOrInit(actorName)
 
@@ -299,19 +300,19 @@ func (provider *Boltdb) GetSnapshot(actorName string) (interface{}, int, bool) {
 	// if !load && e.snapshot == nil {
 	// 	return nil, 0, false
 	// }
-	log.Println("entry GetSnapshot: --------")
+	//log.Println("entry GetSnapshot: --------")
 
 	dstCopy := make([]byte, len(snapshot))
 	copy(dstCopy, snapshot)
 	snap := provider.snapFunc(dstCopy)
-	log.Printf("entry GetSnapshot: -------- indexSanp -> %d", e.eventIndexSnap)
+	//log.Printf("entry GetSnapshot: -------- indexSanp -> %d", e.eventIndexSnap)
 	return snap, e.eventIndexSnap, true
 }
 
 //GetEvents get events for actor from eventIndexStart
 func (provider *Boltdb) GetEvents(actorName string,
 	eventIndexStart int, callback func(e interface{})) {
-	log.Println("GetEvents")
+	//log.Println("GetEvents")
 
 	e, _ := provider.loadOrInit(actorName)
 	provider.mu.Lock()
@@ -337,7 +338,7 @@ func (provider *Boltdb) GetEvents(actorName string,
 		if bkEvents == nil {
 			return bolt.ErrBucketNotFound
 		}
-		log.Printf("bucket event: %s, %d, %d, %d", keyEvents, eventIndexStart, e.eventIndexSnap, e.eventIndex)
+		//log.Printf("bucket event: %s, %d, %d, %d", keyEvents, eventIndexStart, e.eventIndexSnap, e.eventIndex)
 
 		for i := eventIndexStart; i <= e.eventIndex; i++ {
 			v := bkEvents.Get([]byte(strconv.Itoa(i)))
@@ -346,7 +347,7 @@ func (provider *Boltdb) GetEvents(actorName string,
 				log.Printf("event error: %s", v)
 				continue
 			}
-			log.Printf("event get: %s\n\n\n\n", v)
+			//log.Printf("event get: %s\n\n\n\n", v)
 			events[i] = make([]byte, 0)
 			events[i] = append(events[i], v...)
 		}
@@ -358,7 +359,7 @@ func (provider *Boltdb) GetEvents(actorName string,
 		return
 	}
 	// e.storeEvents = &entryEvents{events}
-	log.Printf("events load")
+	//log.Printf("events load")
 
 	// for i := eventIndexStart; i <= e.eventIndex; i++ {
 	// 	if _, ok := events[i]; !ok {
@@ -383,12 +384,12 @@ func (provider *Boltdb) GetEvents(actorName string,
 func (provider *Boltdb) PersistEvent(actorName string,
 	eventIndex int, event proto.Message) {
 
-	log.Printf("persist Events init ")
+	//log.Printf("persist Events init ")
 	if provider.store[actorName] != nil && provider.store[actorName].eventsBucket != nil {
 		// log.Printf("bucket in event: %s", provider.store[actorName].eventsBucket)
 	}
 	e, _ := provider.loadOrInit(actorName)
-	log.Printf("bucket in event: %s", e.eventsBucket)
+	//log.Printf("bucket in event: %s", e.eventsBucket)
 	provider.mu.Lock()
 	defer provider.mu.Unlock()
 
@@ -399,11 +400,11 @@ func (provider *Boltdb) PersistEvent(actorName string,
 		log.Println(err)
 		return
 	}
-	log.Printf("persist Events -> %s\n", evt)
+	//log.Printf("persist Events -> %s\n", evt)
 	// e.events[eventIndex] = evt[:]
 	// e.eventIndex = eventIndex
 
-	log.Printf("persist Events, eventsbucket: --------%s\n", e.eventsBucket)
+	//log.Printf("persist Events, eventsbucket: --------%s\n", e.eventsBucket)
 	// log.Printf("persist Events, event: --------%#v\n", entry.events)
 
 	// provider.mu.Lock()
@@ -421,7 +422,7 @@ func (provider *Boltdb) PersistEvent(actorName string,
 			}
 			e.eventIndexSnap = eventIndex
 		}
-		log.Printf("persist event, eventIndexSnap: %d", e.eventIndexSnap)
+		//log.Printf("persist event, eventIndexSnap: %d", e.eventIndexSnap)
 
 		err = bkActor.Put([]byte(keyEventIndex), []byte(strconv.Itoa(eventIndex)))
 		if err != nil {
@@ -435,11 +436,7 @@ func (provider *Boltdb) PersistEvent(actorName string,
 		if err := bk.Put([]byte(strconv.Itoa(eventIndex)), []byte(evt)); err != nil {
 			return err
 		}
-		log.Printf("bucket: %s, eventIndex: %d",
-			e.eventsBucket,
-			eventIndex,
-			// event,
-		)
+		//log.Printf("bucket: %s, eventIndex: %d", e.eventsBucket, eventIndex)
 		return nil
 	}); err != nil {
 		log.Println(err)
@@ -451,7 +448,7 @@ func (provider *Boltdb) PersistEvent(actorName string,
 func (provider *Boltdb) PersistSnapshot(actorName string,
 	eventIndex int, snapshot proto.Message) {
 
-	log.Printf("index request Snapshot: %d", eventIndex)
+	//log.Printf("index request Snapshot: %d", eventIndex)
 
 	e, _ := provider.loadOrInit(actorName)
 	provider.mu.Lock()
@@ -466,6 +463,7 @@ func (provider *Boltdb) PersistSnapshot(actorName string,
 		return
 	}
 
+	keyEvents := []byte(fmt.Sprintf("%s-%s", keyEventsPrefix, uuid.New()))
 	if err := provider.db.Update(func(tx *bolt.Tx) error {
 		bk, err := tx.CreateBucketIfNotExists([]byte(actorName))
 		if err != nil {
@@ -478,9 +476,8 @@ func (provider *Boltdb) PersistSnapshot(actorName string,
 			return err
 		}
 
-		log.Printf("update snapshot")
-		log.Printf("update snapshot, eventsbucket: --------%s\n", e.eventsBucket)
-		keyEvents := []byte(fmt.Sprintf("%s-%s", keyEventsPrefix, uuid.New()))
+		//log.Printf("update snapshot")
+		//log.Printf("update snapshot, eventsbucket: --------%s\n", e.eventsBucket)
 		_, err = bk.CreateBucketIfNotExists(keyEvents)
 		if err != nil {
 			return err
@@ -491,12 +488,14 @@ func (provider *Boltdb) PersistSnapshot(actorName string,
 		if lastEvents != nil {
 			bk.DeleteBucket(lastEvents)
 		}
+		e.eventsBucket = keyEvents
+		e.lastEventsBucket = keyEvents
 
 		err = bk.Put([]byte(keyLastEvents), keyEvents)
 		if err != nil {
 			return err
 		}
-		log.Printf("delete snapshot")
+		//log.Printf("delete snapshot")
 		delete(provider.store, actorName)
 		return nil
 	}); err != nil {
