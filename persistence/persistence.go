@@ -1,14 +1,14 @@
 package persistence
 
 import (
+	"fmt"
 	"log"
 	"strconv"
 	"sync"
 
 	"github.com/boltdb/bolt"
-	"github.com/golang/protobuf/proto"
 	"github.com/google/uuid"
-	"golang.org/x/exp/errors/fmt"
+	"google.golang.org/protobuf/proto"
 )
 
 const (
@@ -486,6 +486,7 @@ func (provider *Boltdb) PersistSnapshot(actorName string,
 		// e.eventsBucket = keyEvents
 
 		if lastEvents != nil {
+			// log.Printf("update snapshot, delete lastEvents bucket: %s", lastEvents)
 			bk.DeleteBucket(lastEvents)
 		}
 		e.eventsBucket = keyEvents
@@ -512,3 +513,7 @@ func (provider *Boltdb) PersistSnapshot(actorName string,
 	// 	provider.store = make(map[string]*entry)
 	// }
 }
+
+func (db *Boltdb) DeleteEvents(actorName string, inclusiveToIndex int) {}
+
+func (db *Boltdb) DeleteSnapshots(actorName string, inclusiveToIndex int) {}
