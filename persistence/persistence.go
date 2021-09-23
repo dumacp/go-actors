@@ -7,8 +7,8 @@ import (
 	"sync"
 
 	"github.com/boltdb/bolt"
+	"github.com/golang/protobuf/proto"
 	"github.com/google/uuid"
-	"google.golang.org/protobuf/proto"
 )
 
 const (
@@ -64,30 +64,16 @@ func NewBoltdbProvider(path string, snapshotInterval int, eventFunc ParseMessage
 }
 
 func (provider *Boltdb) loadOrInit(actorName string) (*entry, bool) {
-	//log.Println("loadOrInit")
-	// var e *entry
 
-	// funcLoad := func() (*entry, bool, error) {
-	// provider.mu.RLock()
-	// defer provider.mu.RUnlock()
-	// var ok bool
 	provider.mu.Lock()
 	defer provider.mu.Unlock()
 
 	et, ok := provider.store[actorName]
 	if ok {
-		// if et != nil {
-		//log.Printf("exit loadOrInit before %s", et.eventsBucket)
 		return et, true
-		// }
 	}
 	e := new(entry)
 	provider.store[actorName] = e
-	//defer log.Printf("exit loadOrInit %s", e.eventsBucket)
-
-	// e.storeEvents = &entryEvents{}
-
-	//	log.Printf("entry: 1--------%q\n", e)
 
 	keyEvents := make([]byte, 0)
 	var num int
@@ -134,33 +120,6 @@ func (provider *Boltdb) loadOrInit(actorName string) (*entry, bool) {
 			e.eventIndexSnap = numSnap
 		}
 
-		// //snapshot
-		// snapshot := bk.Get([]byte("snapshot"))
-		// if snapshot == nil {
-		// 	log.Printf("empty snapshot")
-		// } else {
-		// 	e.snapshot = snapshot
-		// }
-
-		//events
-
-		// bkEvents := bk.Bucket([]byte(keyEvents))
-		// if bkEvents == nil {
-		// 	return bolt.ErrBucketNotFound
-		// }
-		// log.Printf("bucket event: %s, %d, %d", keyEvents, numSnap, num)
-		// events := make(map[int][]byte)
-		// for i := numSnap; i <= num; i++ {
-		// 	v := bkEvents.Get([]byte(strconv.Itoa(i)))
-		// 	// log.Printf("event: %s", v)
-		// 	if v == nil {
-		// 		continue
-		// 	}
-		// 	events[i] = v
-		// }
-		// // e.storeEvents = &entryEvents{events}
-		// log.Printf("events load")
-
 		return nil
 	})
 
@@ -170,62 +129,6 @@ func (provider *Boltdb) loadOrInit(actorName string) (*entry, bool) {
 		//provider.store[actorName] = e
 		return e, false
 	}
-
-	//log.Printf("funcLoad error: %s", err)
-	// return nil, false, err
-
-	//	log.Printf("entry: 2--------%q\n", e)
-	// return e, false, nil
-	// }
-
-	// if entry, _, err := funcLoad(); err == nil {
-
-	//	log.Printf("entry: 3--------%q\n", entry)
-
-	// if mem {
-	// 	return entry, true
-	// }
-
-	// // provider.mu.Lock()
-	// // defer provider.mu.Unlock()
-
-	// if err := provider.db.Update(func(tx *bolt.Tx) error {
-	// 	bk, err := tx.CreateBucketIfNotExists([]byte(actorName))
-	// 	if err != nil {
-	// 		return bolt.ErrBucketNotFound
-	// 	}
-	// 	keyEvents := []byte(fmt.Sprintf("%s-%s", keyEventsPrefix, uuid.New()))
-	// 	_, err = bk.CreateBucketIfNotExists(keyEvents)
-	// 	if err != nil {
-	// 		return err
-	// 	}
-
-	// 	lastEvents := make([]byte, len(entry.eventsBucket))
-	// 	copy(lastEvents, entry.eventsBucket)
-	// 	entry.eventsBucket = keyEvents
-
-	// 	if lastEvents != nil {
-	// 		bk.DeleteBucket(lastEvents)
-	// 	}
-
-	// 	err = bk.Put([]byte(keyLastEvents), keyEvents)
-	// 	if err != nil {
-	// 		return err
-	// 	}
-	// 	return nil
-
-	// }); err != nil {
-	// 	return nil, false
-	// }
-	// provider.store[actorName] = *entry
-	// log.Printf("load init entry: --------%#v\n", entry)
-	// 	return entry, true
-	// }
-
-	// log.Println("loadOrInit 2")
-
-	// provider.mu.Lock()
-	// defer provider.mu.Unlock()
 
 	lastEvents := []byte(fmt.Sprintf("%s-%s", keyEventsPrefix, uuid.New()))
 	err = provider.db.Update(func(tx *bolt.Tx) error {
@@ -247,12 +150,7 @@ func (provider *Boltdb) loadOrInit(actorName string) (*entry, bool) {
 		return nil, false
 	}
 
-	// e.storeEvents = e.storeEvents
 	e.eventIndex = 0
-
-	//provider.store[actorName] = e
-
-	// log.Printf("load init entry final: --------%#v\n", e)
 	return e, false
 }
 
@@ -264,7 +162,6 @@ func (provider *Boltdb) Restart() {
 
 //GetSnapshotInterval get snapshot interval in provider
 func (provider *Boltdb) GetSnapshotInterval() int {
-	//log.Printf("GetSnapshotInterval -> %d", provider.snapshotInterval)
 	interval := provider.snapshotInterval
 	return interval
 }
@@ -295,13 +192,6 @@ func (provider *Boltdb) GetSnapshot(actorName string) (interface{}, int, bool) {
 		return nil, 0, false
 	}
 
-	// provider.mu.Lock()
-	// defer provider.mu.Unlock()
-	// if !load && e.snapshot == nil {
-	// 	return nil, 0, false
-	// }
-	//log.Println("entry GetSnapshot: --------")
-
 	dstCopy := make([]byte, len(snapshot))
 	copy(dstCopy, snapshot)
 	snap := provider.snapFunc(dstCopy)
@@ -311,19 +201,11 @@ func (provider *Boltdb) GetSnapshot(actorName string) (interface{}, int, bool) {
 
 //GetEvents get events for actor from eventIndexStart
 func (provider *Boltdb) GetEvents(actorName string,
-	eventIndexStart int, callback func(e interface{})) {
-	//log.Println("GetEvents")
+	eventIndexStart, eventIndexEnd int, callback func(e interface{})) {
 
 	e, _ := provider.loadOrInit(actorName)
 	provider.mu.Lock()
 	defer provider.mu.Unlock()
-
-	// events := make([][]byte, 0)
-	// log.Printf("get Events, entry: --------%#v\n", e)
-	// log.Printf("get Events, entry: --------%#v\n", e.events)
-	// log.Printf("GetEvents: %d, %d, %d", e.eventIndex, e.eventIndexSnap, eventIndexStart)
-
-	//events
 
 	events := make(map[int][]byte, 0)
 	err := provider.db.View(func(tx *bolt.Tx) error {
@@ -340,7 +222,7 @@ func (provider *Boltdb) GetEvents(actorName string,
 		}
 		//log.Printf("bucket event: %s, %d, %d, %d", keyEvents, eventIndexStart, e.eventIndexSnap, e.eventIndex)
 
-		for i := eventIndexStart; i <= e.eventIndex; i++ {
+		for i := eventIndexStart; i <= eventIndexEnd; i++ {
 			v := bkEvents.Get([]byte(strconv.Itoa(i)))
 			// log.Printf("event: %s", v)
 			if v == nil || len(v) <= 0 {
@@ -358,17 +240,6 @@ func (provider *Boltdb) GetEvents(actorName string,
 		log.Printf("error load event -> %s", err)
 		return
 	}
-	// e.storeEvents = &entryEvents{events}
-	//log.Printf("events load")
-
-	// for i := eventIndexStart; i <= e.eventIndex; i++ {
-	// 	if _, ok := events[i]; !ok {
-	// 		continue
-	// 	}
-	// 	ev := make([]byte, len(events[i]))
-	// 	copy(ev, events[i])
-	// 	events = append(events, ev)
-	// }
 
 	for _, v := range events {
 		// log.Printf("get Events: --------%#v\n", ev)
@@ -384,10 +255,6 @@ func (provider *Boltdb) GetEvents(actorName string,
 func (provider *Boltdb) PersistEvent(actorName string,
 	eventIndex int, event proto.Message) {
 
-	//log.Printf("persist Events init ")
-	if provider.store[actorName] != nil && provider.store[actorName].eventsBucket != nil {
-		// log.Printf("bucket in event: %s", provider.store[actorName].eventsBucket)
-	}
 	e, _ := provider.loadOrInit(actorName)
 	//log.Printf("bucket in event: %s", e.eventsBucket)
 	provider.mu.Lock()
@@ -400,15 +267,6 @@ func (provider *Boltdb) PersistEvent(actorName string,
 		log.Println(err)
 		return
 	}
-	// log.Printf("persist Events -> %s\n", evt)
-	// e.events[eventIndex] = evt[:]
-	// e.eventIndex = eventIndex
-
-	//log.Printf("persist Events, eventsbucket: --------%s\n", e.eventsBucket)
-	// log.Printf("persist Events, event: --------%#v\n", entry.events)
-
-	// provider.mu.Lock()
-	// defer provider.mu.Unlock()
 
 	if err := provider.db.Update(func(tx *bolt.Tx) error {
 		bkActor, err := tx.CreateBucketIfNotExists([]byte(actorName))
@@ -514,6 +372,33 @@ func (provider *Boltdb) PersistSnapshot(actorName string,
 	// }
 }
 
-func (db *Boltdb) DeleteEvents(actorName string, inclusiveToIndex int) {}
+func (provider *Boltdb) DeleteEvents(actorName string, inclusiveToIndex int) {
+	// e, _ := provider.loadOrInit(actorName)
+	// //log.Printf("bucket in event: %s", e.eventsBucket)
+	// provider.mu.Lock()
+	// defer provider.mu.Unlock()
+
+	// if err := provider.db.Update(func(tx *bolt.Tx) error {
+	// 	bkActor, err := tx.CreateBucketIfNotExists([]byte(actorName))
+	// 	if err != nil {
+	// 		return err
+	// 	}
+
+	// 	bk := bkActor.Bucket(e.eventsBucket)
+	// 	if bk == nil {
+	// 		return bolt.ErrBucketNotFound
+	// 	}
+
+	// 	eventIndex := e.eventIndex
+	// 	// if err := bk.Put([]byte(strconv.Itoa(eventIndex)), e.events[eventIndex]); err != nil {
+	// 	if err := bk.Delete([]byte(strconv.Itoa(eventIndex))); err != nil {
+	// 		return err
+	// 	}
+	// 	//log.Printf("bucket: %s, eventIndex: %d", e.eventsBucket, eventIndex)
+	// 	return nil
+	// }); err != nil {
+	// 	log.Println(err)
+	// }
+}
 
 func (db *Boltdb) DeleteSnapshots(actorName string, inclusiveToIndex int) {}
