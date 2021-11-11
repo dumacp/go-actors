@@ -157,6 +157,9 @@ func (provider *Boltdb) loadOrInit(actorName string) (*entry, bool) {
 //Restart provider
 func (provider *Boltdb) Restart() {
 	// provider.store = make(map[string]*entry)
+	// if err := provider.db.Close(); err != nil {
+	// 	log.Printf("provider db close error: %s", err)
+	// }
 	log.Println("RESTART persistence provider")
 }
 
