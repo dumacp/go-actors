@@ -33,7 +33,7 @@ type entry struct {
 // 	events map[int][]byte
 // }
 
-//Boltdb struct provider
+// Boltdb struct provider
 type Boltdb struct {
 	db               *bolt.DB
 	snapshotInterval int
@@ -46,7 +46,7 @@ type Boltdb struct {
 
 type ParseMessage func(src []byte) proto.Message
 
-//NewBoltdbProvider create a provider for multiples actors. Only one instance is support in runtime
+// NewBoltdbProvider create a provider for multiples actors. Only one instance is support in runtime
 func NewBoltdbProvider(path string, snapshotInterval int, eventFunc ParseMessage, snapFunc ParseMessage) (*Boltdb, error) {
 
 	db, err := bolt.Open(path, 0664, bolt.DefaultOptions)
@@ -154,7 +154,7 @@ func (provider *Boltdb) loadOrInit(actorName string) (*entry, bool) {
 	return e, false
 }
 
-//Restart provider
+// Restart provider
 func (provider *Boltdb) Restart() {
 	// provider.store = make(map[string]*entry)
 	// if err := provider.db.Close(); err != nil {
@@ -163,13 +163,13 @@ func (provider *Boltdb) Restart() {
 	log.Println("RESTART persistence provider")
 }
 
-//GetSnapshotInterval get snapshot interval in provider
+// GetSnapshotInterval get snapshot interval in provider
 func (provider *Boltdb) GetSnapshotInterval() int {
 	interval := provider.snapshotInterval
 	return interval
 }
 
-//GetSnapshot get last snapshot in provider for actor
+// GetSnapshot get last snapshot in provider for actor
 func (provider *Boltdb) GetSnapshot(actorName string) (interface{}, int, bool) {
 	//log.Println("GetSnapshot")
 
@@ -202,13 +202,11 @@ func (provider *Boltdb) GetSnapshot(actorName string) (interface{}, int, bool) {
 	return snap, e.eventIndexSnap, true
 }
 
-//GetEvents get events for actor from eventIndexStart
+// GetEvents get events for actor from eventIndexStart
 func (provider *Boltdb) GetEvents(actorName string,
 	eventIndexStart, eventIndexEnd int, callback func(e interface{})) {
 
 	e, _ := provider.loadOrInit(actorName)
-	provider.mu.Lock()
-	defer provider.mu.Unlock()
 
 	events := make(map[int][]byte, 0)
 	err := provider.db.View(func(tx *bolt.Tx) error {
@@ -224,6 +222,10 @@ func (provider *Boltdb) GetEvents(actorName string,
 			return bolt.ErrBucketNotFound
 		}
 		//log.Printf("bucket event: %s, %d, %d, %d", keyEvents, eventIndexStart, e.eventIndexSnap, e.eventIndex)
+
+		if eventIndexEnd == 0 {
+			eventIndexEnd = e.eventIndex
+		}
 
 		for i := eventIndexStart; i <= eventIndexEnd; i++ {
 			v := bkEvents.Get([]byte(strconv.Itoa(i)))
@@ -246,15 +248,19 @@ func (provider *Boltdb) GetEvents(actorName string,
 
 	for _, v := range events {
 		// log.Printf("get Events: --------%#v\n", ev)
-		event := provider.eventFunc(v)
+		evt := make([]byte, len(v[:]))
+		copy(evt, v[:])
+		event := provider.eventFunc(evt)
 		// log.Printf("get Events proto, %d: --------%#v\n", i, event)
+		provider.mu.Lock()
 		callback(event)
+		provider.mu.Unlock()
 	}
 	// log.Printf("get Events, entry 2: --------%#v\n", e.events)
 
 }
 
-//PersistEvent persiste event
+// PersistEvent persiste event
 func (provider *Boltdb) PersistEvent(actorName string,
 	eventIndex int, event proto.Message) {
 
@@ -305,7 +311,7 @@ func (provider *Boltdb) PersistEvent(actorName string,
 	e.eventIndex = eventIndex
 }
 
-//PersistSnapshot save snapshot, the snapshot is overwrite
+// PersistSnapshot save snapshot, the snapshot is overwrite
 func (provider *Boltdb) PersistSnapshot(actorName string,
 	eventIndex int, snapshot proto.Message) {
 
