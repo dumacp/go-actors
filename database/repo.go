@@ -14,7 +14,10 @@ func PersistData(id string, data []byte, update bool, buckets ...string) func(*b
 		if len(buckets) <= 0 {
 			return fmt.Errorf("empty buckets")
 		}
-		bkcll := tx.Bucket([]byte(buckets[0]))
+		bkcll, err := tx.CreateBucketIfNotExists([]byte(buckets[0]))
+		if err != nil {
+			return err
+		}
 		if len(buckets) > 1 {
 			for _, bk := range buckets[1:] {
 				var err error
@@ -51,11 +54,14 @@ func GetData(callback func([]byte), id string, buckets ...string) func(*bbolt.Tx
 			return fmt.Errorf("empty buckets")
 		}
 		bkcll := tx.Bucket([]byte(buckets[0]))
+		if bkcll == nil {
+			return nil
+		}
 		if len(buckets) > 1 {
 			for _, bk := range buckets[1:] {
 				bkcll = bkcll.Bucket([]byte(bk))
 				if bkcll == nil {
-					return bbolt.ErrBucketNotFound
+					return nil
 				}
 			}
 		}
@@ -81,6 +87,9 @@ func RemoveData(id string, buckets ...string) func(*bbolt.Tx) error {
 			return fmt.Errorf("empty buckets")
 		}
 		bkcll := tx.Bucket([]byte(buckets[0]))
+		if bkcll == nil {
+			return bbolt.ErrBucketNotFound
+		}
 		if len(buckets) > 1 {
 			for _, bk := range buckets[1:] {
 				bkcll = bkcll.Bucket([]byte(bk))
@@ -109,6 +118,9 @@ func QueryData(ctx context.Context, callback func(data *QueryType), prefixID []b
 			return fmt.Errorf("empty buckets")
 		}
 		bkcll := tx.Bucket([]byte(buckets[0]))
+		if bkcll == nil {
+			return nil
+		}
 		if len(buckets) > 1 {
 			for _, bk := range buckets[1:] {
 				bkcll = bkcll.Bucket([]byte(bk))
@@ -179,11 +191,14 @@ func Last(callback func([]byte), prefixID []byte, buckets ...string) func(*bbolt
 			return fmt.Errorf("empty buckets")
 		}
 		bkcll := tx.Bucket([]byte(buckets[0]))
+		if bkcll == nil {
+			return nil
+		}
 		if len(buckets) > 1 {
 			for _, bk := range buckets[1:] {
 				bkcll = bkcll.Bucket([]byte(bk))
 				if bkcll == nil {
-					return bbolt.ErrBucketNotFound
+					return nil
 				}
 			}
 		}
@@ -241,6 +256,9 @@ func ListKeys(callback func(list [][]byte), buckets ...string) func(*bbolt.Tx) e
 			return fmt.Errorf("empty buckets")
 		}
 		bkcll := tx.Bucket([]byte(buckets[0]))
+		if bkcll == nil {
+			return bbolt.ErrBucketNotFound
+		}
 		if len(buckets) > 1 {
 			for _, bk := range buckets[1:] {
 				bkcll = bkcll.Bucket([]byte(bk))
