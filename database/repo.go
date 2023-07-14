@@ -18,6 +18,7 @@ func PersistData(id string, data []byte, update bool, buckets ...string) func(*b
 		if err != nil {
 			return err
 		}
+		fmt.Printf("buckets: %v\n", buckets)
 		if len(buckets) > 1 {
 			for _, bk := range buckets[1:] {
 				var err error
@@ -44,6 +45,7 @@ func PersistData(id string, data []byte, update bool, buckets ...string) func(*b
 		if err := bkcll.Put([]byte(id), data); err != nil {
 			return err
 		}
+		fmt.Printf("buckets: %v\n", buckets)
 		return nil
 	}
 }
@@ -117,10 +119,12 @@ func QueryData(ctx context.Context, callback func(data *QueryType), prefixID []b
 		if len(buckets) <= 0 {
 			return fmt.Errorf("empty buckets")
 		}
+		fmt.Printf("buckets: %v\n", buckets)
 		bkcll := tx.Bucket([]byte(buckets[0]))
 		if bkcll == nil {
 			return nil
 		}
+		fmt.Printf("buckets: %v\n", buckets)
 		if len(buckets) > 1 {
 			for _, bk := range buckets[1:] {
 				bkcll = bkcll.Bucket([]byte(bk))
@@ -135,7 +139,7 @@ func QueryData(ctx context.Context, callback func(data *QueryType), prefixID []b
 			if reverse {
 				c.Seek(prefixID)
 				for k, v := c.Last(); k != nil && bytes.HasPrefix(k, prefixID); k, v = c.Prev() {
-					// fmt.Printf("key=%s, value=%s\n", k, v)
+					fmt.Printf("key=%s, value=%s\n", k, v)
 					select {
 					case <-ctx.Done():
 						fmt.Printf("close query datadb")
@@ -146,7 +150,7 @@ func QueryData(ctx context.Context, callback func(data *QueryType), prefixID []b
 				}
 			} else {
 				for k, v := c.Seek(prefixID); k != nil && bytes.HasPrefix(k, prefixID); k, v = c.Next() {
-					// fmt.Printf("key=%s, value=%s\n", k, v)
+					fmt.Printf("key=%s, value=%s\n", k, v)
 					select {
 					case <-ctx.Done():
 						fmt.Printf("close query datadb")
@@ -159,7 +163,7 @@ func QueryData(ctx context.Context, callback func(data *QueryType), prefixID []b
 		} else {
 			if reverse {
 				for k, v := c.Last(); k != nil; k, v = c.Prev() {
-					// fmt.Printf("key=%s, value=%s\n", k, v)
+					fmt.Printf("key=%s, value=%s\n", k, v)
 					select {
 					case <-ctx.Done():
 						fmt.Printf("close query datadb")
@@ -170,7 +174,7 @@ func QueryData(ctx context.Context, callback func(data *QueryType), prefixID []b
 				}
 			} else {
 				for k, v := c.First(); k != nil; k, v = c.Next() {
-					// fmt.Printf("key=%s, value=%s\n", k, v)
+					fmt.Printf("key=%s, value=%s\n", k, v)
 					select {
 					case <-ctx.Done():
 						fmt.Printf("close query datadb")

@@ -100,9 +100,9 @@ func (a *dbActor) CloseState(ctx actor.Context) {
 }
 
 func (a *dbActor) WaitState(ctx actor.Context) {
-	logs.LogBuild.Printf("Message arrive in datab (WaitState): %T, %s",
-		ctx.Message(), ctx.Sender())
-	// logs.LogBuild.Printf("Message arrive in datab (WaitState): %s, %T, %s", ctx.Message(), ctx.Message(), ctx.Sender())
+	// logs.LogBuild.Printf("Message arrive in datab (WaitState): %T, %s",
+	//		ctx.Message(), ctx.Sender())
+	logs.LogBuild.Printf("Message arrive in datab (WaitState): %s, %T, %s", ctx.Message(), ctx.Message(), ctx.Sender())
 	switch msg := ctx.Message().(type) {
 	case *MsgFlushFilesystem:
 		if a.db != nil {
@@ -175,7 +175,7 @@ func (a *dbActor) WaitState(ctx actor.Context) {
 				id = msg.ID
 			}
 
-			// logs.LogBuild.Printf("STEP 6_0000: %s", ctx.Sender())
+			logs.LogBuild.Printf("STEP 6_0000: %s", ctx.Sender())
 			if err := a.db.Update(PersistData(id, msg.Data, true, msg.Buckets...)); err != nil {
 				return err
 			}
@@ -185,7 +185,7 @@ func (a *dbActor) WaitState(ctx actor.Context) {
 					Bucktes: msg.Buckets,
 				})
 			}
-			// logs.LogBuild.Printf("STEP 6_1111: %s", ctx.Sender())
+			logs.LogBuild.Printf("STEP 6_1111: %s", ctx.Sender())
 			//TODO:
 			//time.Sleep(1 * time.Second)
 			return nil
@@ -266,6 +266,9 @@ func (a *dbActor) WaitState(ctx actor.Context) {
 			contxt, cancel := context.WithCancel(context.TODO())
 
 			callback := func(v *QueryType) {
+				if ctx.Sender() == nil {
+					return
+				}
 				// log.Printf("data in channel: %s, %s", v.ID, pid)
 				data := make([]byte, len(v.Data))
 				copy(data, v.Data)
