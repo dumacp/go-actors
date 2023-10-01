@@ -64,7 +64,27 @@ func Open(ctx actor.Context, pathdb string) (DB, error) {
 	}
 	instance.pid = pid
 
-	time.Sleep(1 * time.Second)
+	t1 := time.NewTicker(30 * time.Millisecond)
+	defer t1.Stop()
+	tEnd := time.NewTimer(6000 * time.Millisecond)
+	defer tEnd.Stop()
+
+	if err := func() error {
+		for {
+			select {
+			case <-t1.C:
+				if err := instance.rootctx.RequestFuture(pid, &ping{}, 30*time.Millisecond).Wait(); err != nil {
+					continue
+				} else {
+					return nil
+				}
+			case <-tEnd.C:
+				return fmt.Errorf("timeout error")
+			}
+		}
+	}(); err != nil {
+		return nil, err
+	}
 	return instance, nil
 }
 
@@ -86,6 +106,7 @@ func (a *dbActor) CloseState(ctx actor.Context) {
 		if a.cancel != nil {
 			a.cancel()
 		}
+	case *ping:
 	case *MsgErrorDB:
 		a.fm.Event(a.contxt, eError)
 	case *MsgOpenDB:
@@ -99,11 +120,18 @@ func (a *dbActor) CloseState(ctx actor.Context) {
 	}
 }
 
+type ping struct{}
+type pong struct{}
+
 func (a *dbActor) WaitState(ctx actor.Context) {
 	// logs.LogBuild.Printf("Message arrive in datab (WaitState): %T, %s",
 	//		ctx.Message(), ctx.Sender())
 	logs.LogBuild.Printf("Message arrive in datab (WaitState): %s, %T, %s", ctx.Message(), ctx.Message(), ctx.Sender())
 	switch msg := ctx.Message().(type) {
+	case *ping:
+		if ctx.Sender() != nil {
+			ctx.Respond(&pong{})
+		}
 	case *MsgFlushFilesystem:
 		if a.db != nil {
 			if err := a.db.Sync(); err != nil {
