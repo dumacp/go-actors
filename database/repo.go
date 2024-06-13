@@ -139,7 +139,7 @@ func QueryData(ctx context.Context, callback func(data *QueryType), prefixID []b
 			if reverse {
 				c.Seek(prefixID)
 				for k, v := c.Last(); k != nil && bytes.HasPrefix(k, prefixID); k, v = c.Prev() {
-					fmt.Printf("key=%s, value=%s\n", k, v)
+					// fmt.Printf("key=%s, value=%s\n", k, v)
 					select {
 					case <-ctx.Done():
 						fmt.Printf("close query datadb")
@@ -150,7 +150,7 @@ func QueryData(ctx context.Context, callback func(data *QueryType), prefixID []b
 				}
 			} else {
 				for k, v := c.Seek(prefixID); k != nil && bytes.HasPrefix(k, prefixID); k, v = c.Next() {
-					fmt.Printf("key=%s, value=%s\n", k, v)
+					// fmt.Printf("key=%s, value=%s\n", k, v)
 					select {
 					case <-ctx.Done():
 						fmt.Printf("close query datadb")
@@ -163,7 +163,7 @@ func QueryData(ctx context.Context, callback func(data *QueryType), prefixID []b
 		} else {
 			if reverse {
 				for k, v := c.Last(); k != nil; k, v = c.Prev() {
-					fmt.Printf("key=%s, value=%s\n", k, v)
+					// fmt.Printf("key=%s, value=%s\n", k, v)
 					select {
 					case <-ctx.Done():
 						fmt.Printf("close query datadb")
@@ -174,7 +174,7 @@ func QueryData(ctx context.Context, callback func(data *QueryType), prefixID []b
 				}
 			} else {
 				for k, v := c.First(); k != nil; k, v = c.Next() {
-					fmt.Printf("key=%s, value=%s\n", k, v)
+					// fmt.Printf("key=%s, value=%s\n", k, v)
 					select {
 					case <-ctx.Done():
 						fmt.Printf("close query datadb")

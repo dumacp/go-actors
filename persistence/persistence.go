@@ -7,8 +7,8 @@ import (
 	"sync"
 
 	"github.com/boltdb/bolt"
-	"github.com/golang/protobuf/proto"
 	"github.com/google/uuid"
+	"google.golang.org/protobuf/proto"
 )
 
 const (
